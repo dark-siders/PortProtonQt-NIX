@@ -75,13 +75,24 @@ Inside `configuration.nix` / `home.nix`:
 > **Note:** the package depends on `steam-run` and requires
 > `config.allowUnfree = true;` (already set inside the flake itself).
 
+### Polkit privileges for wine — optional
+
+Upstream fixed CVE-2026-59678 in 1.3.1: the polkit rule
+`ru.linux_gaming.PortProtonQt.rules` no longer relies on a `ps` check, instead it
+grants privileges only to members of the `portprotonqt` group. NixOS does not
+create that group automatically, so to allow seamless disk mounting / NetworkManager
+editing from the GUI, add:
+
+```nix
+users.groups.portprotonqt = { };
+users.users.YOUR_USER.extraGroups = [ "portprotonqt" ];
+```
+
+Without this the polkit rule simply won't trigger (safe default); the app keeps
+working.
+
 ## Caveats / known limitations
 
-- **PortProtonQt's polkit rule is not installed.** The upstream build ships a polkit
-  rule with a known vulnerability (see oss-security, July 2026), so the
-  `share/polkit-1/rules.d` and `lib/sysusers.d` blocks are excluded from the install.
-  If you really need polkit-level privileges, apply the rule deliberately and at your
-  own risk.
 - The build assumes a clean NixOS. The bash engine runs through `steam-run`, so the
   first Wine/Proton initialization may take noticeably longer.
 - Tested on `x86_64-linux`.

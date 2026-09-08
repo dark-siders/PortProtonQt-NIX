@@ -126,9 +126,11 @@ in
     postInstall = let
       pythondir = "${python}/${python.sitePackages}";
     in ''
-      # polkit-правило из апстрима содержит известную уязвимость
-      # (oss-security, июль 2026) — не устанавливаем его и sysusers.d.
-      rm -rf "$out/share/polkit-1" "$out/lib/sysusers.d"
+      # polkit-правило и sysusers.d оставляем как в апстриме (CVE-2026-59678
+      # закрыт в 1.3.1): правило теперь даёт привилегии только членам группы
+      # portprotonqt, которую создаёт /lib/sysusers.d/portprotonqt.conf.
+      # На NixOS группу нужно завести через users.groups.portprotonqt = { };
+      # (см. README).
 
       # Скрипты bash-движка, которые meson положил в $out/share/portproton/scripts,
       # должны исполняться внутри FHS (steam-run), т.к. PortProton скачивает
