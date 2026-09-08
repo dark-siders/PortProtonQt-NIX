@@ -1,7 +1,7 @@
 {
   lib,
   stdenv,
-  fetchFromGitLab,
+  fetchurl,
   meson,
   ninja,
   pkg-config,
@@ -42,12 +42,11 @@
 
   # upstream main на git.linux-gaming.ru: содержит фикс поиска скриптов/локалей
   # через XDG_DATA_DIRS (коммит f1a5db4f, ещё не попавший в релиз/GitHub-зеркало).
-  src = fetchFromGitLab {
-    domain = "git.linux-gaming.ru";
-    owner = "Linux-Gaming";
-    repo = "PortProtonQt";
-    rev = "f1a5db4f34ce7edcbc7aa8e8b687d917c3f79458";
-    hash = "sha256-xrp9RQlgoLJdN1/lKgmxN1ApGURvgs7Mu1IA8JBgcmY=";
+  # Инстанс git.linux-gaming.ru работает на Gitea/Forgejo — у него НЕТ API
+  # `/api/v4/...` (fetchFromGitLab давал 404), поэтому берём архив по Gitea-URL.
+  src = fetchurl {
+    url = "https://git.linux-gaming.ru/Linux-Gaming/PortProtonQt/archive/f1a5db4f34ce7edcbc7aa8e8b687d917c3f79458.tar.gz";
+    hash = "sha256-VkWjpdVeDIFn75fYfPeCOyj4HxAubxLJ/lYj/PgKm+Y=";
   };
 
   # Python-окружение со всеми зависимостями GUI
@@ -153,11 +152,18 @@ in
         --set PYTHONPATH "$out/${python.sitePackages}:${pythondir}" \
         --prefix PATH : ${runtimeBinPath}:${steam-run}/bin \
         --prefix QT_PLUGIN_PATH : ${qt6.qtbase}/${qt6.qtbase.qtPluginPrefix} \
+        --set SHARUN_DIR "$out" \
         --prefix XDG_DATA_DIRS : "$out/share"
 
-      # XDG_DATA_DIRS=$out/share — апстрим (f1a5db4f) ищет через него и скрипты
-      # ($out/share/portproton/scripts), и локали ($out/share/locale/*.mo).
-      # Поэтому APPDIR/SHARUN_DIR-костыли больше не нужны.
+      # SHARUN_DIR=$out — штатный механизм апстрима (AppImage/sharun):
+      # get_portproton_scripts_path() берёт $SHARUN_DIR/share/portproton/scripts,
+      # а localization.py — $SHARUN_DIR/share/locale.
+      #
+      # XDG_DATA_DIRS:$out/share — как в системной установке апстрима (/usr/share):
+      # Qt/GIO при регистрации в xdg-desktop-portal ищет desktop-файл
+      # ru.linux_gaming.PortProtonQt.desktop по XDG_DATA_DIRS самого приложения.
+      # Без этого префикса портал не находит app info → ошибка
+      # «Could not register app ID: App info not found».
     '';
 
     meta = with lib; {

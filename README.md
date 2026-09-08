@@ -1,4 +1,8 @@
 <p align="center">
+  <img src="assets/Logo.jpg" alt="PortProtonQt" width="60%"/>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/PortProtonQt-1.4.1-blue" alt="Версия"/>
   <img src="https://img.shields.io/badge/NixOS-grey?logo=nixos" alt="NixOS"/>
   <img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="Лицензия"/>
