@@ -144,9 +144,14 @@ in
       wrapProgram "$out/bin/portprotonqt" \
         --set PYTHONPATH "$out/${python.sitePackages}:${pythondir}" \
         --set APPDIR "$out" \
+        --set SHARUN_DIR "$out" \
         --prefix PATH : ${runtimeBinPath}:${steam-run}/bin \
         --prefix QT_PLUGIN_PATH : ${qt6.qtbase}/${qt6.qtbase.qtPluginPrefix} \
         --prefix XDG_DATA_DIRS : "$out/share"
+
+      # SHARUN_DIR указывает localization.py на $out/share/locale, где лежат
+      # скомпилированные .mo (ru, de, es ...) — без этого GUI всегда английский,
+      # т.к. на NixOS нет системного /usr/share/locale.
     '';
 
     meta = with lib; {
