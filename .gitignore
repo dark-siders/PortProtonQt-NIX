@@ -1,0 +1,11 @@
+# Nix
+result
+result-*
+/nix/store
+
+# Derivation and build artifacts
+*.drv
+*.o
+*.so
+*.a
+.direnv
