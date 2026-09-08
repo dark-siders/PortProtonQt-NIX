@@ -1,7 +1,7 @@
 {
   lib,
   stdenv,
-  fetchFromGitHub,
+  fetchFromGitLab,
   meson,
   ninja,
   pkg-config,
@@ -40,11 +40,14 @@
   version = "1.4.1";
   pname = "portprotonqt";
 
-  src = fetchFromGitHub {
-    owner = "linux-gaming-ru";
+  # upstream main на git.linux-gaming.ru: содержит фикс поиска скриптов/локалей
+  # через XDG_DATA_DIRS (коммит f1a5db4f, ещё не попавший в релиз/GitHub-зеркало).
+  src = fetchFromGitLab {
+    domain = "git.linux-gaming.ru";
+    owner = "Linux-Gaming";
     repo = "PortProtonQt";
-    rev = "18ae09f4b0d084353e4166053df435d64a573507"; # v1.4.1
-    hash = "sha256-I07eFM9lHqnu2RPpgE5v7fI69mgXVwd/X33A2vCzyVQ=";
+    rev = "f1a5db4f34ce7edcbc7aa8e8b687d917c3f79458";
+    hash = "sha256-xrp9RQlgoLJdN1/lKgmxN1ApGURvgs7Mu1IA8JBgcmY=";
   };
 
   # Python-окружение со всеми зависимостями GUI
@@ -135,25 +138,26 @@ in
       # Скрипты bash-движка, которые meson положил в $out/share/portproton/scripts,
       # должны исполняться внутри FHS (steam-run), т.к. PortProton скачивает
       # динамические бинари Wine/Proton вне nix-store.
-      mkdir -p "$out/share/portproton/scripts/.nix-real"
-      mv "$out/share/portproton/scripts/start.sh" "$out/share/portproton/scripts/.nix-real/start.sh"
+      # start.sh апстрима вычисляет PORT_SCRIPTS_PATH как dirname(realpath $0),
+      # поэтому реальный скрипт обязан лежать в самой scripts/ (не в подпапке),
+      # иначе он не находит functions_helper/var/conf. Переименовываем оригинал
+      # и кладём рядом обёртку, запускающую двигатель внутри steam-run.
+      mv "$out/share/portproton/scripts/start.sh" "$out/share/portproton/scripts/start.sh.real"
       cat > "$out/share/portproton/scripts/start.sh" <<'WRAP'
       #!/usr/bin/env bash
-      exec ${steam-run}/bin/steam-run "$(dirname "$(realpath "$0")")/.nix-real/start.sh" "$@"
+      exec ${steam-run}/bin/steam-run "$(dirname "$(realpath "$0")")/start.sh.real" "$@"
       WRAP
       chmod +x "$out/share/portproton/scripts/start.sh"
 
       wrapProgram "$out/bin/portprotonqt" \
         --set PYTHONPATH "$out/${python.sitePackages}:${pythondir}" \
-        --set APPDIR "$out" \
-        --set SHARUN_DIR "$out" \
         --prefix PATH : ${runtimeBinPath}:${steam-run}/bin \
         --prefix QT_PLUGIN_PATH : ${qt6.qtbase}/${qt6.qtbase.qtPluginPrefix} \
         --prefix XDG_DATA_DIRS : "$out/share"
 
-      # SHARUN_DIR указывает localization.py на $out/share/locale, где лежат
-      # скомпилированные .mo (ru, de, es ...) — без этого GUI всегда английский,
-      # т.к. на NixOS нет системного /usr/share/locale.
+      # XDG_DATA_DIRS=$out/share — апстрим (f1a5db4f) ищет через него и скрипты
+      # ($out/share/portproton/scripts), и локали ($out/share/locale/*.mo).
+      # Поэтому APPDIR/SHARUN_DIR-костыли больше не нужны.
     '';
 
     meta = with lib; {
