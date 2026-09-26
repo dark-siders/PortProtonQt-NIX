@@ -128,6 +128,15 @@ in
     postInstall = let
       pythondir = "${python}/${python.sitePackages}";
     in ''
+      # Entry-point из апстрима — это python-скрипт с shebang
+      # `#!/usr/bin/env python3`. В nix-store нет /usr/bin/env, поэтому такой
+      # shebang работает только если python3 есть в системном PATH: на чистом
+      # NixOS запуск падает с «env: 'python3': No such file or directory».
+      # Прописываем интерпретатор из store, чтобы запуск вообще не зависел от
+      # системного PATH.
+      substituteInPlace "$out/bin/portprotonqt" \
+        --replace-fail "/usr/bin/env python3" "${python}/bin/python3"
+
       # polkit-правило и sysusers.d оставляем как в апстриме (CVE-2026-59678
       # закрыт в 1.3.1): правило теперь даёт привилегии только членам группы
       # portprotonqt, которую создаёт /lib/sysusers.d/portprotonqt.conf.
@@ -150,7 +159,7 @@ in
 
       wrapProgram "$out/bin/portprotonqt" \
         --set PYTHONPATH "$out/${python.sitePackages}:${pythondir}" \
-        --prefix PATH : ${runtimeBinPath}:${steam-run}/bin \
+        --prefix PATH : ${lib.makeBinPath [ python ]}:${runtimeBinPath}:${steam-run}/bin \
         --prefix QT_PLUGIN_PATH : ${qt6.qtbase}/${qt6.qtbase.qtPluginPrefix} \
         --set SHARUN_DIR "$out" \
         --prefix XDG_DATA_DIRS : "$out/share"

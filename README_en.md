@@ -25,6 +25,7 @@ The package is built **from source** (meson + Python/C), not from an AppImage.
 ## Features
 
 - GUI starts through an isolated `python3.withPackages` (all PySide6 and support deps).
+  No system `python3` in `PATH` is required — the interpreter comes from the nix store.
 - The native C gamepad module (SDL3) and the `vk_gpu_info` (Vulkan) utility are built via meson.
 - **PortProton's bash engine** (`start.sh`) runs inside an **FHS environment** through
   `steam-run`, so that the dynamically compiled Wine/Proton builds downloaded by the
@@ -36,7 +37,7 @@ The package is built **from source** (meson + Python/C), not from an AppImage.
 ### Run directly from the flake
 
 ```bash
-nix run github:dark_siders/portprotonqt-nix
+nix run gitlab:dark_siders/portprotonqt-nix
 ```
 
 ### Build
@@ -52,7 +53,7 @@ Add this to your `flake.nix`:
 ```nix
 {
   inputs = {
-    portprotonqt-nix.url = "github:dark_siders/portprotonqt-nix";
+    portprotonqt-nix.url = "gitlab:dark_siders/portprotonqt-nix";
   };
 
   outputs = { self, nixpkgs, portprotonqt-nix, ... }:

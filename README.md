@@ -25,6 +25,7 @@ Nix-флейк для сборки **PortProtonQt** — современного
 ## Возможности
 
 - Запуск GUI через изолированный `python3.withPackages` (все зависимости PySide6 и поддержки).
+  Системный `python3` в `PATH` не требуется — интерпретатор берётся из nix-store.
 - Нативный C-модуль геймпада (SDL3) и утилита `vk_gpu_info` (Vulkan) собираются через meson.
 - **Bash-движок PortProton** (`start.sh`) исполняется внутри **FHS-окружения** через
   `steam-run`, чтобы динамически скомпилированные сборки Wine/Proton, которые
@@ -36,7 +37,7 @@ Nix-флейк для сборки **PortProtonQt** — современного
 ### Запуск напрямую из флейка
 
 ```bash
-nix run github:dark_siders/portprotonqt-nix
+nix run gitlab:dark_siders/portprotonqt-nix
 ```
 
 ### Сборка
@@ -52,7 +53,7 @@ nix build .
 ```nix
 {
   inputs = {
-    portprotonqt-nix.url = "github:dark_siders/portprotonqt-nix";
+    portprotonqt-nix.url = "gitlab:dark_siders/portprotonqt-nix";
   };
 
   outputs = { self, nixpkgs, portprotonqt-nix, ... }:
