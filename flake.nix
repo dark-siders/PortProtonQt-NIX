@@ -28,8 +28,16 @@
 
         overlays.default = self.overlays.default;
 
+        # `nix flake check` прогоняет все три:
+        #   package — сборка + checkPhase (наличие утилит в замыкании);
+        #   package-tests — импорты, desktop/metainfo, синтаксис движка и
+        #                 запуск CLI в пустом окружении на собранном $out;
+        #   nixos — NixOS VM без python3 и util-linux в systemPackages.
+        # Быстрый прогон без VM: nix build .#checks.x86_64-linux.package{,-tests}
         checks = {
-          inherit (self.packages.${system}) portprotonqt;
+          package = self.packages.${system}.portprotonqt;
+          package-tests = self.packages.${system}.portprotonqt.tests.package;
+          nixos = self.packages.${system}.portprotonqt.tests.nixos;
         };
       }
     )

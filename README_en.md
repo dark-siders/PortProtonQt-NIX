@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/PortProtonQt-1.4.1-blue" alt="Version"/>
+  <img src="https://img.shields.io/badge/PortProtonQt-1.4.1--unreleased-20260908-blue" alt="Version"/>
   <img src="https://img.shields.io/badge/NixOS-grey?logo=nixos" alt="NixOS"/>
   <img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="License"/>
   <a href="README.md"><img src="https://img.shields.io/badge/🇷🇺%20Русский-blue" alt="Русский"/></a>
@@ -18,9 +18,17 @@ The package is built **from source** (meson + Python/C), not from an AppImage.
 
 ## What's inside
 
-- `flake.nix` — the flake with our package and an overlay.
+- `flake.nix` — the flake with our package, an overlay and the checks (`checks`).
 - `overlay.nix` — an overlay that adds `portprotonqt` to nixpkgs.
-- `pkgs/portprotonqt/default.nix` — the derivation, pinned to the fixed `v1.4.1` release.
+- `pkgs/portprotonqt/default.nix` — the derivation.
+
+## Version
+
+The package is built from **`main`, not from a release tag**: `main` carries NixOS
+fixes that were not in the 1.4.1 release (2026-08-26). The version is therefore
+honestly labelled `1.4.1-unreleased-20260908`, and the exact revision lives in
+`passthru.upstreamCommit`. These changes are expected to land in the 1.5 release —
+after that the pin can be moved to a tag.
 
 ## Features
 
@@ -30,6 +38,9 @@ The package is built **from source** (meson + Python/C), not from an AppImage.
 - **PortProton's bash engine** (`start.sh`) runs inside an **FHS environment** through
   `steam-run`, so that the dynamically compiled Wine/Proton builds downloaded by the
   app itself run correctly on NixOS.
+- The package is **self-contained in its utilities**: `sed`, `lsblk`, `pactl`, `xrandr`,
+  `7z`, `cabextract`, `unrar`, `curl` and the rest come from its own closure rather
+  than from the system `PATH`. The `steam-run` FHS does not provide some of them.
 - The data path is configured in the GUI/config, no source patching needed.
 
 ## Usage
@@ -44,6 +55,26 @@ nix run gitlab:dark_siders/portprotonqt-nix
 
 ```bash
 nix build .
+```
+
+## Checks
+
+```bash
+nix flake check
+```
+
+Three sets run:
+
+| attribute | what it checks |
+| --- | --- |
+| `package` | the build itself plus `checkPhase`: every utility the engine and the GUI invoke directly is available in the closure |
+| `package-tests` | python module imports (PySide6, the native gamepad module), `desktop-file-validate`, `appstreamcli validate`, the syntax of every bash script of the engine, and a CLI run in an empty environment (`env -i` with no system `PATH`) |
+| `nixos` | a NixOS VM whose `systemPackages` contains only `portprotonqt` — no `python3`. Verifies that the package starts and that the utilities come from its own closure |
+
+Fast run without the VM:
+
+```bash
+nix build .#checks.x86_64-linux.package .#checks.x86_64-linux.package-tests
 ```
 
 ### Use in your own config via overlay
@@ -100,7 +131,17 @@ working.
 
 - The build assumes a clean NixOS. The bash engine runs through `steam-run`, so the
   first Wine/Proton initialization may take noticeably longer.
-- Tested on `x86_64-linux`.
+- `src` is built from `main`, not from a tag: `version` = `1.4.1-unreleased-20260908`.
+  This is deliberate — 1.4.1 does not contain the NixOS fixes yet.
+- The package is available for `x86_64-linux` only (`steam-run` does not build for
+  other systems).
+- The environment is not fully closed: `steam`, `flatpak` and `legendary`/`gogdl` for
+  the Epic/GOG launchers are expected to be installed in the system — the package does
+  not pull them in.
+- `meta.maintainers` is empty: a maintainer has to be registered before the package
+  can go into nixpkgs.
+
+Detailed NixOS-specific notes (autoinstall, external launchers, FHS, data path) — in **[NIXOS_NOTES.md](NIXOS_NOTES.md)**.
 
 ## License
 
