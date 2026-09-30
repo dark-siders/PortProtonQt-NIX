@@ -3,59 +3,90 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/PortProtonQt-1.4.1--unreleased-20260908-blue" alt="Версия"/>
-  <img src="https://img.shields.io/badge/NixOS-grey?logo=nixos" alt="NixOS"/>
+  <img src="https://img.shields.io/badge/PortProtonQt-1.4.1-blue" alt="Версия"/>
+  <img src="https://img.shields.io/badge/NixOS-unstable-yellow?logo=nixos" alt="NixOS"/>
   <img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="Лицензия"/>
   <a href="README_en.md"><img src="https://img.shields.io/badge/🇬🇧%20English-blue" alt="English"/></a>
 </p>
 
 # PortProtonQt for NixOS
 
-Nix-флейк для сборки **PortProtonQt** — современного GUI (PySide6) для запуска и
-управления играми из PortProton, Steam, Epic Games Store и GOG.
+Nix-флейк, собирающий **PortProtonQt** — графический интерфейс (PySide6) для
+запуска и управления играми из PortProton, Steam, Epic Games Store и GOG.
 
-Пакет собирается **из исходников** (meson + Python/C), а не из AppImage.
+Собирается **из исходников апстрима** через Meson. AppImage не используется.
 
-## Что внутри
-
-- `flake.nix` — флейк с нашим пакетом, overlay и проверками (`checks`).
-- `overlay.nix` — overlay, добавляющий `portprotonqt` в nixpkgs.
-- `pkgs/portprotonqt/default.nix` — derivation.
-
-## Версия
-
-Пакет собирается **не с тега releases, а с `main`**: в `main` есть NixOS-фиксы,
-которых в релиз 1.4.1 (2026-08-26) ещё не было. Поэтому версия честно помечена
-как `1.4.1-unreleased-20260908`, а точная ревизия лежит в
-`passthru.upstreamCommit`. Ожидается, что эти изменения войдут в релиз 1.5 —
-после него пин можно будет перевести на тег.
-
-## Возможности
-
-- Запуск GUI через изолированный `python3.withPackages` (все зависимости PySide6 и поддержки).
-  Системный `python3` в `PATH` не требуется — интерпретатор берётся из nix-store.
-- Нативный C-модуль геймпада (SDL3) и утилита `vk_gpu_info` (Vulkan) собираются через meson.
-- **Bash-движок PortProton** (`start.sh`) исполняется внутри **FHS-окружения** через
-  `steam-run`, чтобы динамически скомпилированные сборки Wine/Proton, которые
-  скачивает само приложение, корректно запускались на NixOS.
-- Пакет **самодостаточен по утилитам**: `sed`, `lsblk`, `pactl`, `xrandr`, `7z`,
-  `cabextract`, `unrar`, `curl` и прочее берутся из его замыкания, а не из
-  системного `PATH`. FHS `steam-run` часть из них не содержит.
-- Путь к данным настраивается в GUI/конфиге, патчить исходники не нужно.
-
-## Использование
-
-### Запуск напрямую из флейка
+## Быстрый старт
 
 ```bash
 nix run gitlab:dark_siders/portprotonqt-nix
 ```
 
-### Сборка
+или из клона репозитория:
+
+```bash
+nix run .#portproton
+```
+
+Сборка:
 
 ```bash
 nix build .
+./result/bin/portprotonqt
 ```
+
+## Что внутри
+
+Весь пакет — один файл `flake.nix`. Отдельных derivation'ов, оверлеев и
+директорий `pkgs/` нет: пакет строится из входа `portprotonqt-src`, который
+тянет официальный репозиторий апстрима.
+
+| | |
+| --- | --- |
+| Источник | `git+https://git.linux-gaming.ru/Linux-Gaming/PortProtonQt`, ветка `main` |
+| Пин ревизии | `flake.lock` (`portprotonqt-src`) |
+| Сборка | Meson + Nix, версия `1.4.1` |
+| Python | `python313.withPackages` со всем набором зависимостей |
+| FHS-слой | `steam-run` |
+
+## Версия
+
+Пакет собирается **с ветки `main`, а не с тега релиза**: версия в derivation —
+`1.4.1`, но исходники всегда свежие. Точная ревизия зафиксирована в
+`flake.lock`. Так NixOS-фиксы апстрима подхватываются сразу, без ожидания
+следующего релиза.
+
+## Как это работает
+
+PortProtonQt — не только GUI. Он же тянет и запускает **bash-движок PortProton**
+(`start.sh`), который скачивает Wine/Proton и запускает игры. Этому движку нужна
+обычная FHS-система с glibc, bash и системными утилитами, чего в NixOS нет.
+
+Поэтому пакет запускается через **`steam-run`** — FHS-окружение на базе
+bubblewrap, уже присутствующее в nixpkgs. Ничего самодельного: своя FHS-сборка
+не нужна, `steam-run` умеет всё, что требуется.
+
+## Правки для NixOS
+
+Апстрим NixOS не поддерживает официально, поэтому три вещи приходится чинить в
+`postInstall`. Разбор — в **[NIXOS_NOTES.md](NIXOS_NOTES.md)**.
+
+1. **Абсолютный интерпретатор в скриптах движка.** `steam-run` отдаёт в
+   песочницу `PATH`, где `python3` — чужой интерпретатор из FHS-образа. Он
+   подхватывает чистые модули вроде `babel`, но не грузит скомпилированные
+   (`orjson`, `pyside6`) — несовпадает ABI-тег. Во все вызовы
+   `python3 -m portprotonqt...` подставляется путь к интерпретатору из env.
+2. **Защита `kill_portwine`.** Функция ищет bwrap через
+   `pgrep -f wrap | grep PortProton` и шлёт `kill -n 9`. Под `steam-run` этот
+   bwrap — собственный контейнер сессии, а у него `--die-with-parent`, поэтому
+   всё падало с SIGKILL (код 137) ещё до запуска игры. Из списка на kill
+   выбрасываются bwrap-PID, являющиеся предками текущего шелла.
+3. **Строгая проверка подмен.** Если апстрим переименует свои вызовы или
+   переставит якорь в `functions_helper`, сборка упадёт с внятной ошибкой, а не
+   сломается молча у пользователя.
+
+Никаких правок исходников на уровне Python — всё делается на уровне
+установленных скриптов.
 
 ## Проверки
 
@@ -63,23 +94,20 @@ nix build .
 nix flake check
 ```
 
-Прогоняются три набора:
-
 | атрибут | что проверяет |
 | --- | --- |
-| `package` | сама сборка + `checkPhase`: все утилиты, которые движок и GUI зовут напрямую, доступны в замыкании |
-| `package-tests` | импорт python-модулей (PySide6, нативный модуль геймпада), `desktop-file-validate`, `appstreamcli validate`, синтаксис всех bash-скриптов движка и запуск CLI в пустом окружении (`env -i` без системного `PATH`) |
-| `nixos` | NixOS VM, где в `systemPackages` лежит только `portprotonqt` — без `python3`. Проверяет, что пакет стартует и что утилиты приходят из его замыкания |
+| `package` | сама сборка |
+| `cli` | обёртка зовёт `steam-run` и прописывает `PYTHONPATH`; в скриптах движка нет голых вызовов `python3 -m portprotonqt`; на месте защита `kill_portwine`; `bash -n` сходит для обоих скриптов; CLI отдаёт справку; `orjson` и `babel` импортируются тем же интерпретатором, которым зовут хелперы движка |
 
-Быстрый прогон без VM:
+Быстрый прогон одного набора:
 
 ```bash
-nix build .#checks.x86_64-linux.package .#checks.x86_64-linux.package-tests
+nix build .#checks.x86_64-linux.cli
 ```
 
-### Подключение в собственный конфиг через overlay
+## Подключение в свой конфиг
 
-Добавьте в `flake.nix`:
+Через inputs (рекомендуется):
 
 ```nix
 {
@@ -87,60 +115,65 @@ nix build .#checks.x86_64-linux.package .#checks.x86_64-linux.package-tests
     portprotonqt-nix.url = "gitlab:dark_siders/portprotonqt-nix";
   };
 
-  outputs = { self, nixpkgs, portprotonqt-nix, ... }:
-    let
+  outputs = { nixpkgs, portprotonqt-nix, ... }: {
+    nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
-      pkgs = import nixpkgs {
-        inherit system;
-        overlays = [ portprotonqt-nix.overlays.default ];
-      };
-    in {
-      packages.${system}.default = pkgs.portprotonqt;
+      modules = [
+        ({ modulesPath, ... }: {
+          imports = [ (modulesPath + "/installer/scan/not-detected.nix") ];
+          nixpkgs.overlays = [ portprotonqt-nix.overlays.default ];
+          environment.systemPackages = [ pkgs.portprotonqt ];
+        })
+      ];
     };
+  };
 }
 ```
 
-Внутри `configuration.nix` / `home.nix`:
+Или напрямую во flake-конфиге:
 
 ```nix
-{ config, pkgs, ... }: {
+{
+  inputs.portprotonqt-nix.url = "gitlab:dark_siders/portprotonqt-nix";
+  # ...
+  nixpkgs.overlays = [ inputs.portprotonqt-nix.overlays.default ];
   environment.systemPackages = [ pkgs.portprotonqt ];
 }
 ```
 
-> **Примечание:** пакет зависит от `steam-run` и требует `config.allowUnfree = true;`
-> (в самом флейке уже задано).
+> **Примечание:** пакет зависит от `steam-run` (проприетарный), поэтому нужен
+> `nixpkgs.config.allowUnfree = true;` — во флейке он уже задан.
 
-### Права для wine (polkit) — опционально
+## Права для wine (polkit) — опционально
 
 Апстрим закрыл CVE-2026-59678 в 1.3.1: polkit-правило
 `ru.linux_gaming.PortProtonQt.rules` больше не полагается на проверку `ps`, а
 даёт привилегии только членам группы `portprotonqt`. На NixOS эта группа не
-создаётся системой автоматически, поэтому, если хотите разрешить бесшовное
-монтирование дисков / правку NetworkManager прямо из GUI, добавьте:
+создаётся системой автоматически. Если хотите разрешить бесшовное монтирование
+дисков и правку NetworkManager прямо из GUI, добавьте:
 
 ```nix
 users.groups.portprotonqt = { };
 users.users.YOUR_USER.extraGroups = [ "portprotonqt" ];
 ```
 
-Без этой настройки группы polkit-правило просто не сработает (безопасный
-дефолт), приложение продолжит работать.
+Без этого polkit-правило просто не сработает (безопасный дефолт) — приложение
+продолжит работать.
 
-## Нюансы / известные ограничения
+## Ограничения
 
-- Сборка предполагает чистый NixOS. Bash-движок запускается через `steam-run`, из-за
-  чего первая инициализация Wine/Proton может занять заметно больше времени.
-- `src` собирается с `main`, а не с тега: `version` = `1.4.1-unreleased-20260908`.
-  Это осознанно — релизных NixOS-правок в 1.4.1 ещё нет.
-- Пакет доступен только для `x86_64-linux` (`steam-run` не собирается под другие системы).
-- Полное закрытое окружение: `steam`, `flatpak`, `legendary`/`gogdl` для лаунчеров
-  Epic/GOG ожидаются установленными в системе — пакет их не тянет.
-- `meta.maintainers` пуст: для попадания в nixpkgs нужно завести maintainer.
-
-Подробные NixOS-нюансы (автоинсталл, внешние лаунчеры, FHS, путь данных) — в **[NIXOS_NOTES.md](NIXOS_NOTES.md)**.
+- Только `x86_64-linux`: `steam-run` под другие системы не собирается.
+- Первая инициализация Wine/Proton заметно дольше обычного: движок качает
+  дистрибутивы и компилирует модули уже внутри FHS-окружения.
+- Пакет тянет ветку `main` апстрима, а не тег: возможны сюрпризы при обновлении
+  `flake.lock`. Фиксированная ревизия всегда в `flake.lock`.
+- `legendary` в nixpkgs отсутствует и в замыкание не включён. Если он нужен
+  для Epic Games Store, ставьте отдельно.
+- Путь к данным PortProton задаётся в GUI или через `PORT_DATA_PATH`. В флейк
+  никакие личные пути не зашиты.
+- `meta.maintainers` пуст — для попадания в nixpkgs нужно завести maintainer.
 
 ## Лицензия
 
-Код пакета обёртки (`nix`-выражения) — MIT. Сам **PortProtonQt** распространяется
-под лицензией **GPL-3.0**.
+Nix-выражения флейка — MIT. Сам **PortProtonQt** распространяется под
+лицензией **GPL-3.0**.
