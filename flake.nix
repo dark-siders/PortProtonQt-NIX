@@ -67,11 +67,6 @@
           # Meson build
           mesonFlags = [ "-Dnightly=false" ];
 
-          #--- ВРЕМЕННО: патч Бориса (PORTPROTONQT_PYTHON + guard в kill_portwine)
-          # Заменяет обе наши postInstall-правки. Удалить, когда он вольётся
-          # в апстрим и мы переедем на новую ревизию в flake.lock.
-          patches = [ ./patches/upstream-python-and-killportwine.patch ];
-
           #--- Обёртка: запуск через steam-run (FHS), как в Redm00use
           postInstall = ''
             mv $out/bin/portprotonqt $out/bin/.portprotonqt-unwrapped
