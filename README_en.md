@@ -69,24 +69,24 @@ FHS build is not needed, `steam-run` covers everything required.
 
 ## NixOS fixes
 
-Upstream does not officially support NixOS, so three things have to be fixed in
-`postInstall`. The details are in **[NIXOS_NOTES.md](NIXOS_NOTES.md)**.
+Upstream does not officially support NixOS. Two main issues are **fixed in
+upstream** (commit `e25b52f3`), only strict validation remains in `postInstall`.
 
 1. **Absolute interpreter in the engine scripts.** `steam-run` exposes a `PATH`
    inside the sandbox where `python3` is a foreign interpreter from the FHS
    image. It picks up pure-Python modules like `babel`, but fails to load
-   compiled ones (`orjson`, `pyside6`) because the ABI tag differs. An absolute
-   path to the env interpreter is substituted into every
-   `python3 -m portprotonqt...` call.
+   compiled ones (`orjson`, `pyside6`) because the ABI tag differs.
+   **Fixed upstream**: `app.py` sets `PORTPROTONQT_PYTHON=sys.executable`,
+   engine scripts call `${PORTPROTONQT_PYTHON:-python3}`.
 2. **`kill_portwine` guard.** The function looks for bwrap via
    `pgrep -f wrap | grep PortProton` and sends `kill -n 9`. Under `steam-run`
    that bwrap *is* the session's own container, and it carries
    `--die-with-parent`, so everything died with SIGKILL (exit code 137) before the
-   game even started. bwrap PIDs that are ancestors of the current shell are
-   dropped from the kill list.
-3. **Strict substitution checks.** If upstream renames its calls or moves the
-   anchor in `functions_helper`, the build fails with a clear error instead of
-   breaking silently for the user.
+   game even started. **Fixed upstream**: `functions_helper` now has a
+   `pw_ancestor_pid` guard that drops ancestor PIDs from the kill list.
+3. **Strict validation checks** (in `postInstall`). If upstream renames the
+   `PORTPROTONQT_PYTHON` variable or removes the `pw_ancestor_pid` guard,
+   the build fails with a clear error instead of breaking silently for the user.
 
 No source-level Python patches — everything happens at the level of the
 installed scripts.
