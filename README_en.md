@@ -173,8 +173,11 @@ application keeps working.
 - The package tracks upstream's `main` branch rather than a tag, so surprises are
   possible when `flake.lock` is updated. The pinned revision is always in
   `flake.lock`.
-- `legendary` is absent from nixpkgs and is not included in the closure. Install
-  it separately if you need it for the Epic Games Store.
+- `gogdl` (GOG) and `legendary` (Epic) are not part of the closure, but you do
+  not need to install them: PortProtonQt downloads them itself from the official
+  Heroic releases into `~/.local/share/PortProtonQt/bin` (with sha256
+  verification) and updates them every 30 days. They are taken from `PATH` only
+  when its own binary is missing.
 - The PortProton data path is set in the GUI or via `PORT_DATA_PATH`. No personal
   paths are hardcoded in the flake.
 - `meta.maintainers` is empty — a maintainer has to be appointed before this can

@@ -67,6 +67,11 @@
           # Meson build
           mesonFlags = [ "-Dnightly=false" ];
 
+          #--- ВРЕМЕННО: патч Бориса (PORTPROTONQT_PYTHON + guard в kill_portwine)
+          # Заменяет обе наши postInstall-правки. Удалить, когда он вольётся
+          # в апстрим и мы переедем на новую ревизию в flake.lock.
+          patches = [ ./patches/upstream-python-and-killportwine.patch ];
+
           #--- Обёртка: запуск через steam-run (FHS), как в Redm00use
           postInstall = ''
             mv $out/bin/portprotonqt $out/bin/.portprotonqt-unwrapped
@@ -74,26 +79,26 @@
             #--- NixOS/FHS: steam-run отдаёт в песочницу PATH=/run/wrappers/bin:/usr/bin:...
             # поэтому `python3` там — ЧУЖОЙ интерпретатор. Наши скомпилированные
             # модули (orjson, pyside6) он не грузит, а чистые (babel) грузит —
-            # отсюда разнородные ошибки. Подставляем абсолютный python из env
-            # во все вызовы хелперов PortProton.
-            # Внимание: functions_helper БЕЗ расширения .sh — глоб по *.sh его не ловит.
-            # --replace-fail (а не просто --replace) упадёт сам, если апстрим
-            # переименует вызовы: ломаться молча нельзя.
+            # отсюда разнородные ошибки.
+            # Сейчас это чинит патч апстрима: app.py прописывает
+            # PORTPROTONQT_PYTHON=$(sys.executable), а скрипты движка зовут
+            # PORTPROTONQT_PYTHON с фолбэком на python3. Свою подстановку
+            # абсолютного пути в postInstall убрали — она больше не нужна
+            # и конфликтует с патчем.
+            #
+            # Строгая проверка: если апстрим переименует переменную или уберёт
+            # вызовы, молча ломаться нельзя — падаем на сборке, а не у юзера.
             for f in "$out/share/portproton/scripts/start.sh" \
                      "$out/share/portproton/scripts/functions_helper" ; do
-              substituteInPlace "$f" \
-                --replace-fail "python3 -m portprotonqt" \
-                               "${python}/bin/python3 -m portprotonqt"
+              grep -q "PORTPROTONQT_PYTHON" "$f" || {
+                echo "portprotonqt: в $f нет PORTPROTONQT_PYTHON — патч не применился?" >&2
+                exit 1
+              }
+              bash -n "$f" || {
+                echo "portprotonqt: синтаксис сломан в $f" >&2
+                exit 1
+              }
             done
-
-            # Строгая проверка: если апстрим переименует вызовы, молча ломаться
-            # нельзя — падаем на сборке, а не у пользователя в GUI.
-            if grep -rqE "(^|[^/[:alnum:]_.-])python3 -m portprotonqt" \
-                 "$out/share/portproton/scripts/start.sh" \
-                 "$out/share/portproton/scripts/functions_helper" ; then
-              echo "portprotonqt: остались голые вызовы 'python3 -m portprotonqt'" >&2
-              exit 1
-            fi
 
             makeWrapper ${lib.getExe pkgs.steam-run} $out/bin/portprotonqt \
               --add-flags $out/bin/.portprotonqt-unwrapped \
@@ -108,55 +113,13 @@
             # и шлёт ему SIGKILL. Под steam-run этот bwrap — наш же контейнер,
             # а у bwrap стоит --die-with-parent, поэтому сессия умирает с
             # SIGKILL (137), и GUI показывает "ProcessError.Crashed code: 9".
-            # Выкидываем из списка на kill все bwrap-PID, являющиеся предками
-            # текущего шелла. Вставляем перед циклом kill — он единственный.
-            _pp_fh="$out/share/portproton/scripts/functions_helper"
-            _pp_anchor='    for pw_kill_pids in ''${bwrap_pids} ''${wine_pids}; do'
-            if ! grep -q "_pw_collect_ancestor_pids" "$_pp_fh" ; then
-              if ! grep -qF "$_pp_anchor" "$_pp_fh" ; then
-                echo "portprotonqt: НЕ НАЙДЕН якорь kill_portwine в functions_helper" >&2
-                exit 1
-              fi
-              # Блок передаём через переменную окружения, а не `awk -v`:
-              # -v переинтерпретирует escape-последовательности в значении.
-              _pp_block="$(cat <<'PPBLOCK'
-    # --- NixOS/steam-run fix: never SIGKILL our own bwrap container ---
-    _pw_collect_ancestor_pids() {
-        local pid=$$ ppid out=""
-        while [[ -n "$pid" && "$pid" -gt 1 ]]; do
-            ppid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d '[:space:]')
-            [[ -z "$ppid" ]] && break
-            [[ "$ppid" == "0" || "$ppid" == "$pid" ]] && break
-            out="$out $ppid"
-            pid=$ppid
-        done
-        echo "$out"
-    }
-    if [[ -n "''${bwrap_pids:-}" ]]; then
-        _pw_ancestors="$(_pw_collect_ancestor_pids)"
-        _pw_kept=""
-        for _pw_bwrap in $bwrap_pids; do
-            case " $_pw_ancestors " in
-                *" $_pw_bwrap "*) continue ;;
-            esac
-            _pw_kept="''${_pw_kept:+$_pw_kept }$_pw_bwrap"
-        done
-        bwrap_pids="$_pw_kept"
-    fi
-    # --- end steam-run fix ---
-PPBLOCK
-)"
-              _pp_block="$_pp_block" awk -v anchor="$_pp_anchor" '
-                !done && index($0, anchor) { printf "%s\n", ENVIRON["_pp_block"]; done=1 }
-                { print }
-              ' "$_pp_fh" > "$_pp_fh.tmp"
-              mv "$_pp_fh.tmp" "$_pp_fh"
-              grep -q "_pw_collect_ancestor_pids" "$_pp_fh" || {
-                echo "portprotonqt: не удалось вставить защиту kill_portwine" >&2
-                exit 1
-              }
-              echo "portprotonqt: защита kill_portwine установлена"
-            fi
+            # Сейчас это чинит патч апстрима: он отбрасывает bwrap-PID, являющиеся
+            # предками текущего шелла ($BASHPID и выше по ps -o ppid=).
+            # Свою вставку этого блока убрали — она больше не нужна.
+            grep -q "pw_ancestor_pid" "$out/share/portproton/scripts/functions_helper" || {
+              echo "portprotonqt: нет guard'а предков в kill_portwine — патч не применился?" >&2
+              exit 1
+            }
           '';
 
           meta = with pkgs.lib; {
@@ -224,21 +187,29 @@ PPBLOCK
               exit 1
             }
 
-            # 2. Регресс: NixOS-правки на месте (апстрим их не содержит)
-            #    a) вызовы python3 -m указывают на интерпретатор из env
-            if grep -rqE "(^|[^/[:alnum:]_.-])python3 -m portprotonqt" \
-                 "$out/share/portproton/scripts/start.sh" \
-                 "$out/share/portproton/scripts/functions_helper" ; then
-              echo "FAIL: остались голые вызовы python3 -m portprotonqt" >&2
+            # 2. Регресс: NixOS-правки на месте (взяты из патча апстрима)
+            #    a) скрипты движка зовут интерпретатор через PORTPROTONQT_PYTHON
+            for f in "$out/share/portproton/scripts/start.sh" \
+                     "$out/share/portproton/scripts/functions_helper" ; do
+              grep -q 'PORTPROTONQT_PYTHON:-python3' "$f" || {
+                echo "FAIL: в $f нет обращения к PORTPROTONQT_PYTHON" >&2
+                exit 1
+              }
+            done
+            #    b) app.py прописывает себе sys.executable — иначе движок
+            #       запустится с чужим интерпретатором из FHS
+            grep -q 'PORTPROTONQT_PYTHON.*=.*sys.executable' \
+              "$out/lib/python3.13/site-packages/portprotonqt/app.py" || {
+              echo "FAIL: app.py не прописывает PORTPROTONQT_PYTHON=sys.executable" >&2
               exit 1
-            fi
-            #    b) защита kill_portwine от самоубийства контейнера
-            grep -q "_pw_collect_ancestor_pids" \
+            }
+            #    c) защита kill_portwine от самоубийства контейнера
+            grep -q "pw_ancestor_pid" \
               "$out/share/portproton/scripts/functions_helper" || {
               echo "FAIL: нет защиты kill_portwine" >&2
               exit 1
             }
-            #    c) синтаксис движка не сломан
+            #    d) синтаксис движка не сломан
             for f in "$out/share/portproton/scripts/start.sh" \
                      "$out/share/portproton/scripts/functions_helper" ; do
               bash -n "$f" || {
