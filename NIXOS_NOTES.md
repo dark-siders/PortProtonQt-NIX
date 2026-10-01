@@ -1,8 +1,13 @@
 # PortProtonQt на NixOS: технические заметки
 
-Документ описывает, **почему** пакет пришлось дополнять правками и как именно
-диагностировалась каждая проблема. Полезно, если апстрим что-то изменит и
-ошибки повторятся.
+Документ описывает, **почему** NixOS-пакет устроен именно так: какие проблемы
+возникали на стыке двух сред, как они диагностировались и как были устранены.
+Полезно, если апстрим что-то изменит и ошибки повторятся.
+
+> Изначально эти правки делались в `postInstall` нашей сборки. Сейчас обе
+> проблемы **исправлены в апстриме** (коммит `e25b52f3`), поэтому в пакете
+> осталась только строгая проверка на регресс. История ниже сохранена, потому
+> что она объясняет, почему проверки вообще существуют.
 
 ## Общая схема
 
@@ -13,7 +18,7 @@ nix run .#portproton
   steam-run (FHS на bubblewrap)          ← nixpkgs, проприетарный
         │
         ▼
-  portprotonqt (PySide6, env-python3)    ← GUI
+  portprotonqt (PySide6, python3.13)     ← GUI
         │
         ▼
   start.sh + functions_helper            ← bash-движок PortProton
@@ -31,8 +36,9 @@ nix run .#portproton
 - **Движок** — FHS-окружение. Качает и компилирует Wine/Proton, поэтому нужна
   настоящая система с glibc, bash, `sed`, `tar`, ядром и `/usr`.
 
-`steam-run` даёт второе. На NixOS его приходится запускать вручную, и все
-проблемы возникают на стыке этих двух сред.
+`steam-run` даёт второе. На NixOS его нужно запускать явно — пакет делает это
+через `makeWrapper`, так что пользователь получает готовую команду
+`portprotonqt`. Все проблемы возникают на стыке этих двух сред.
 
 ## Проблема 1: `python3` в скриптах движка
 
@@ -271,13 +277,22 @@ PortProton скачать нужный самому.
 1. **Код возврата.** `137` — контейнер убит, смотри `kill_portwine`. Любое
    другое значение — идём дальше.
 2. **Хвост `PortProton.log`.** Это первое, что стоит приложить к багрепорту.
-3. **Изолированная проверка интерпретатора** — без GUI и без запуска игры:
+3. **Проверить, что NixOS-фиксы на месте.** Это делает готовый чек флейка —
+   он проверяет и `PORTPROTONQT_PYTHON`, и `app.py`, и guard `kill_portwine`:
 
    ```bash
-   out=$(nix path-info .#portproton)
-   env PYTHONPATH="$out/lib/python3.13/site-packages" \
-       "$(nix eval --raw --impure --expr '...')" \
-       -c "import orjson, babel, portprotonqt"
+   nix build .#checks.x86_64-linux.cli
+   ```
+
+   Если нужно глянуть руками:
+
+   ```bash
+   out=$(nix path-info .#portprotonqt)
+   grep -c 'PORTPROTONQT_PYTHON:-python3' \
+     "$out/share/portproton/scripts/start.sh" \
+     "$out/share/portproton/scripts/functions_helper"
+   grep -c 'pw_ancestor_pid' \
+     "$out/share/portproton/scripts/functions_helper"
    ```
 
 4. **Версии runtime** — `VERSIONS.txt` в каталоге `libs_*`.
