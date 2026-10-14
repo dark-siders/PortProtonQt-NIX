@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/PortProtonQt-1.4.1-blue" alt="Version"/>
+  <img src="https://img.shields.io/badge/PortProtonQt-1.5.0-blue" alt="Version"/>
   <img src="https://img.shields.io/badge/NixOS-unstable-yellow?logo=nixos" alt="NixOS"/>
   <img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="License"/>
   <a href="README.md"><img src="https://img.shields.io/badge/🇷🇺%20Русский-blue" alt="Russian"/></a>
@@ -45,7 +45,7 @@ derivations, overlays or `pkgs/` directories: the package is built from the
 | --- | --- |
 | Source | `git+https://git.linux-gaming.ru/Linux-Gaming/PortProtonQt`, branch `main` |
 | Pinned revision | `flake.lock` (`portprotonqt-src`) |
-| Build | Meson + Nix, version `1.4.1` |
+| Build | Meson + Nix, version `1.5.0` |
 | Python | `python313.withPackages` with the full dependency set |
 | FHS layer | `steam-run` |
 

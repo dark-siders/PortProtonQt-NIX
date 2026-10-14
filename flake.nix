@@ -34,12 +34,13 @@
           ps.evdev
           ps.libarchive-c
           ps.rapidfuzz
+          ps.qrcode
         ]);
 
         # Build PortProtonQt via meson
         portprotonqt = pkgs.stdenvNoCC.mkDerivation {
           pname = "portprotonqt";
-          version = "1.4.1";
+          version = "1.5.0";
 
           src = portprotonqt-src;
 
@@ -55,6 +56,7 @@
             stdenv.cc
             makeWrapper
             steam-run
+            kdePackages.wrapQtAppsHook
           ];
 
           buildInputs = with pkgs; [
@@ -62,12 +64,28 @@
             vulkan-loader
             vulkan-headers
             python
+            qt6.qtbase
+            qt6.qtdeclarative
+            qt6.qtsvg
+            qt6.qtwayland
+            kdePackages.breeze-icons
+            kdePackages.oxygen-icons
+            glib
+            glibmm
+            gtk3
+            dbus
+            libappindicator-gtk3
+            fontconfig
+            freetype
+            harfbuzz
+            python313Packages.pyside6
+            python313Packages.shiboken6
           ];
 
           # Meson build
           mesonFlags = [ "-Dnightly=false" ];
 
-          #--- Обёртка: запуск через steam-run (FHS), как в Redm00use
+          #--- Обёртка: запуск через steam-run (FHS)
           postInstall = ''
             mv $out/bin/portprotonqt $out/bin/.portprotonqt-unwrapped
 
@@ -100,6 +118,11 @@
               --prefix PYTHONPATH ':' "$out/lib/python3.13/site-packages" \
               --prefix XDG_DATA_DIRS ':' "$out/share" \
               --prefix PATH ':' "$out/bin:${python}/bin" \
+              --prefix QT_PLUGIN_PATH ':' "${pkgs.qt6.qtbase}/lib/qt6/plugins:${pkgs.qt6.qtwayland}/lib/qt6/plugins" \
+              --prefix XDG_DATA_DIRS ':' "${pkgs.kdePackages.breeze-icons}/share:${pkgs.kdePackages.oxygen-icons}/share" \
+              --set QT_QPA_PLATFORMTHEME "qt6ct" \
+              --set QT_STYLE_OVERRIDE "kvantum-dark" \
+              --set ICON_THEME "breeze" \
               --set STEAM_RUNTIME 1 \
               --set STEAM_RUNTIME_PREFER_FRESH 1
 

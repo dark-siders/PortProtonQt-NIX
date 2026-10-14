@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/PortProtonQt-1.4.1-blue" alt="Версия"/>
+  <img src="https://img.shields.io/badge/PortProtonQt-1.5.0-blue" alt="Версия"/>
   <img src="https://img.shields.io/badge/NixOS-unstable-yellow?logo=nixos" alt="NixOS"/>
   <img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="Лицензия"/>
   <a href="README_en.md"><img src="https://img.shields.io/badge/🇬🇧%20English-blue" alt="English"/></a>
