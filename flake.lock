@@ -37,15 +37,16 @@
     "portprotonqt-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1791995467,
-        "narHash": "sha256-VnHpk1Bnun1MzuZAtzISsMjLRpaxLxETe1cQF9mDuR0=",
-        "ref": "refs/heads/main",
-        "rev": "bf93eff67d08a4ae553abd6ebe1aa5c311529d6b",
-        "revCount": 2350,
+        "lastModified": 1792002076,
+        "narHash": "sha256-uBmTAV7T57PhENZZs1MFP/b5ynuJf1szyWPi6uKI12c=",
+        "ref": "refs/tags/v1.5.0",
+        "rev": "64aedb4a121a2c5ecb735192d9726d5204d2354c",
+        "revCount": 2352,
         "type": "git",
         "url": "https://git.linux-gaming.ru/Linux-Gaming/PortProtonQt"
       },
       "original": {
+        "ref": "refs/tags/v1.5.0",
         "type": "git",
         "url": "https://git.linux-gaming.ru/Linux-Gaming/PortProtonQt"
       }

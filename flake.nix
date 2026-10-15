@@ -4,7 +4,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
-    portprotonqt-src.url = "git+https://git.linux-gaming.ru/Linux-Gaming/PortProtonQt";
+    portprotonqt-src.url = "git+https://git.linux-gaming.ru/Linux-Gaming/PortProtonQt?ref=refs/tags/v1.5.0";
     portprotonqt-src.flake = false;
   };
 
@@ -126,6 +126,18 @@
               --set STEAM_RUNTIME 1 \
               --set STEAM_RUNTIME_PREFER_FRESH 1
 
+            #--- Заголовок окна: только версия, без коммита.
+            # В релизной сборке (-Dnightly=false) апстримный get_version()
+            # всё равно зовёт `git rev-parse --short HEAD` в ТЕКУЩЕМ каталоге,
+            # из-за чего при запуске из git-репы в заголовок попадал её хэш.
+            # Вырезаем runtime-фоллбек целиком (ветка APP_COMMIT для nightly
+            # остаётся), чтобы в файле не было мёртвого кода. Если апстрим
+            # изменит функцию, --replace-fail уронит сборку.
+            app_py="$out/lib/python3.13/site-packages/portprotonqt/app.py"
+            substituteInPlace "$app_py" \
+              --replace-fail $'    try:\n        commit = subprocess.check_output(\n            ["git", "rev-parse", "--short", "HEAD"],\n            stderr=subprocess.DEVNULL,\n        ).decode("utf-8").strip()\n        return f"{__app_version__} ({commit})"\n    except (subprocess.CalledProcessError, FileNotFoundError, OSError):\n        return __app_version__' \
+              '    return __app_version__'
+
             #--- NixOS/steam-run: kill_portwine() убивает собственный контейнер
             # kill_portwine() ищет bwrap через `pgrep -f wrap | grep PortProton`
             # и шлёт ему SIGKILL. Под steam-run этот bwrap — наш же контейнер,
@@ -180,7 +192,7 @@
           # требуют полноценного окружения и не работают в build-песочнице.
           cli = pkgs.runCommand "portprotonqt-cli-test"
             {
-              nativeBuildInputs = [ python pkgs.bash ];
+              nativeBuildInputs = [ python pkgs.bash pkgs.git ];
             } ''
             cp -r ${portprotonqt} $out
             chmod -R +w $out
@@ -194,8 +206,27 @@
             mkdir -p "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" \
                      "$XDG_DATA_HOME" "$XDG_STATE_HOME"
 
-            # 1. Обёртка обязана звать steam-run и прописывать PYTHONPATH
-            wrapper=$out/bin/portprotonqt
+            # 0. В заголовке окна только версия. get_version() не должна
+            #    подхватывать git-коммит из текущего каталога, поэтому зовём
+            #    её, стоя внутри настоящего git-репозитория.
+            pyinterp=$(sed -n '1s|^#!||p' "$out/bin/.portprotonqt-unwrapped")
+            tmpgit=$TMPDIR/gitrepo
+            mkdir -p "$tmpgit"
+            git -C "$tmpgit" init -q
+            git -C "$tmpgit" -c user.email=test@test -c user.name=test \
+              commit -q --allow-empty -m init
+            ( cd "$tmpgit" && \
+              PYTHONPATH="$out/lib/python3.13/site-packages" "$pyinterp" -c \
+                "from portprotonqt.app import get_version; assert '(' not in get_version(), get_version()" ) || {
+              echo "FAIL: get_version() подхватывает git-коммит" >&2
+              exit 1
+            }
+
+            # 1. Обёртка обязана звать steam-run и прописывать PYTHONPATH.
+            # wrapQtAppsHook оборачивает нашу makeWrapper-обёртку в видимый
+            # $out/bin/portprotonqt, а сама она (с steam-run и PYTHONPATH)
+            # остаётся как .portprotonqt-wrapped.
+            wrapper=$out/bin/.portprotonqt-wrapped
             grep -q "steam-run" "$wrapper" || {
               echo "FAIL: обёртка не вызывает steam-run" >&2
               exit 1

@@ -297,7 +297,7 @@ curl -s https://git.linux-gaming.ru/api/v1/repos/Linux-Gaming/PortProtonQt/tags
 
 ### A5. Черновик выражения
 
-Держать черновик `package.nix` под текущий `main` в `/tmp` — не в репозитории.
+Держать черновик `package.nix` под тег `v1.5.0` в `/tmp` — не в репозитории.
 Нужен, чтобы этап B был механической работой.
 
 ---

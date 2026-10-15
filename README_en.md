@@ -43,7 +43,7 @@ derivations, overlays or `pkgs/` directories: the package is built from the
 
 | | |
 | --- | --- |
-| Source | `git+https://git.linux-gaming.ru/Linux-Gaming/PortProtonQt`, branch `main` |
+| Source | `git+https://git.linux-gaming.ru/Linux-Gaming/PortProtonQt`, tag `v1.5.0` |
 | Pinned revision | `flake.lock` (`portprotonqt-src`) |
 | Build | Meson + Nix, version `1.5.0` |
 | Python | `python313.withPackages` with the full dependency set |
@@ -51,10 +51,10 @@ derivations, overlays or `pkgs/` directories: the package is built from the
 
 ## Version
 
-The package is built from the **`main` branch, not a release tag**: the version
-in the derivation is `1.5.0`, but the sources are always current. The exact
-revision is pinned in `flake.lock`. This way upstream NixOS fixes are picked up
-immediately, without waiting for the next release.
+The package is built from the **`v1.5.0` tag**: the `portprotonqt-src` input
+points explicitly at `refs/tags/v1.5.0`, and the exact revision is pinned in
+`flake.lock`. Updates happen only by deliberately changing the tag or running
+`nix flake update` — nothing is pulled automatically.
 
 ## How it works
 
@@ -170,9 +170,8 @@ application keeps working.
 - The first Wine/Proton initialisation takes noticeably longer than usual: the
   engine downloads distributions and compiles modules inside the FHS
   environment.
-- The package tracks upstream's `main` branch rather than a tag, so surprises are
-  possible when `flake.lock` is updated. The pinned revision is always in
-  `flake.lock`.
+- The package is hard-pinned to upstream's `v1.5.0` tag: new fixes arrive only
+  when the tag is changed. The pinned revision is always in `flake.lock`.
 - `gogdl` (GOG) and `legendary` (Epic) are not part of the closure, but you do
   not need to install them: PortProtonQt downloads them itself from the official
   Heroic releases into `~/.local/share/PortProtonQt/bin` (with sha256
