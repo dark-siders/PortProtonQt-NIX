@@ -52,7 +52,7 @@ derivations, overlays or `pkgs/` directories: the package is built from the
 ## Version
 
 The package is built from the **`main` branch, not a release tag**: the version
-in the derivation is `1.4.1`, but the sources are always current. The exact
+in the derivation is `1.5.0`, but the sources are always current. The exact
 revision is pinned in `flake.lock`. This way upstream NixOS fixes are picked up
 immediately, without waiting for the next release.
 
