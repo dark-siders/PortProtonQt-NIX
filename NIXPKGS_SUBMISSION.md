@@ -6,16 +6,17 @@
 > **Статус (2026-10-15):** тег **v1.5.0** вышел (2026-10-14). Отправная точка —
 > тег `v1.5.0`, а не текущая ветка `main`.
 >
-> **Этап A закрыт, идёт этап B.** Флейк уже обновлён под 1.5.0
-> (`version = "1.5.0"`, `qrcode` добавлен). Дальше — B → C без пауз.
+> **Этап A закрыт, этап B выполнен.** Пакет собран в nixpkgs, `nixpkgs-vet`,
+> `nix fmt` и `passthru.tests` — зелёные. Единственный пропущенный пункт — B4
+> (ручной запуск игры; пропущен по решению владельца). Дальше — этап C.
 >
 > - ✅ **A1** — GitHub-аккаунт готов: `dark-siders`, `githubId 29074260`
 > - ✅ **A2** — срок релиза подтверждён апстримом (письмо писать не нужно)
 > - ✅ **A3** — слежка за тегами: тег v1.5.0 вышел (проверка 2026-10-14)
 > - ✅ **A4** — `qrcode` добавлен в `python313.withPackages` во флейке (flake.nix)
-> - ⬜ **A5** — черновик `package.nix` (необязательно, делается на этапе B)
+> - ✅ **A5** — черновик `package.nix` — сделан на этапе B
 >
-> **Текущая фаза:** переход к этапу B по «runbook дня X» ниже. Дальше A5 → B → C.
+> **Текущая фаза:** этап C (коммиты и PR) — по отдельному решению владельца.
 
 ## Цель
 
@@ -306,113 +307,135 @@ curl -s https://git.linux-gaming.ru/api/v1/repos/Linux-Gaming/PortProtonQt/tags
 
 ### B1. Окружение
 
-- [ ] Shallow-клон nixpkgs `master` в `/tmp/opencode/nixpkgs`
-- [ ] `git remote add upstream https://github.com/NixOS/nixpkgs`
-- [ ] `git switch --create portprotonqt-init upstream/master`
-- [ ] `nixos-version --revision` — зафиксировать ревизию nixpkgs, на которой шла сборка
+- [x] Shallow-клон nixpkgs `master` в `/tmp/opencode/nixpkgs`
+- [x] `git remote add upstream https://github.com/NixOS/nixpkgs`
+- [x] `git switch --create portprotonqt-init upstream/master`
+- [x] `nixos-version --revision` — зафиксировать ревизию nixpkgs, на которой шла сборка
+      (ревизия сборки: `bc799d92b`)
 
 Репозиторий этого проекта и конфиг `nixosniri` не трогаем.
 
 ### B2. Вводные под 1.5
 
-- [ ] `version = "1.5.0"`
-- [ ] `src = fetchurl` по шаблону из пункта 1.2
-- [ ] sha256 через `nix-prefetch-url --type sha256 <url>`
+- [x] `version = "1.5.0"`
+- [x] `src = fetchurl` по шаблону из пункта 1.2
+- [x] sha256 через `nix-prefetch-url --type sha256 <url>`
 
 ### B3. Сверка с релизом — обязательный шаг
 
 Не переносить список зависимостей и флаги вслепую из черновика:
 
-- [ ] `meson_options.txt` — набор опций (`python_purelibdir`, `udev_rulesdir`, `nightly`)
-- [ ] `meson.build` — цели установки udev/MIME/polkit/sysusers. В `main` убрана
+- [x] `meson_options.txt` — набор опций (`python_purelibdir`, `udev_rulesdir`, `nightly`)
+- [x] `meson.build` — цели установки udev/MIME/polkit/sysusers. В `main` убрана
       ассоциация с исполняемыми файлами Linux, udev-правило может измениться
-- [ ] `pyproject.toml` — список зависимостей: Epic-интеграция могла добавить модули
-- [ ] `dev-scripts/generate-completions.sh` — на месте ли, не изменился ли интерфейс
-- [ ] `LICENSE` — не сменилась ли лицензия
-- [ ] `README` / `CHANGELOG.md` — для `meta.description` и `meta.changelog`
+- [x] `pyproject.toml` — список зависимостей: Epic-интеграция могла добавить модули
+- [x] `dev-scripts/generate-completions.sh` — на месте ли, не изменился ли интерфейс
+- [x] `LICENSE` — не сменилась ли лицензия
+- [x] `README` / `CHANGELOG.md` — для `meta.description` и `meta.changelog`
 
 ### B4. Перевести на free-FHS
 
 Заменить `pkgs.steam-run` на `(steam.override { extraPkgs = …; }).run-free`.
 
-- [ ] Локально проверить: GUI стартует
+- [x] Локально проверить: GUI стартует
 - [ ] Локально проверить: движок PortProton качает Wine/Proton и запускает игру
-- [ ] Если движку не хватает утилит — добавить в `extraPkgs` **списком с
+      — не выполнялось (пропущено по решению владельца)
+- [x] Если движку не хватает утилит — добавить в `extraPkgs` **списком с
       комментариями**. Кандидаты: `curl`, `p7zip`, `cabextract`, `unzip`,
       `unrar`, `procps`, `psmisc`, `mesa-utils`, `libarchive`, `exiftool`,
-      `squashfs-tools`, `gawk`, `findutils`, `tar`, `zstd`
-- [ ] Начинать с пустого списка `extraPkgs`: база FHS уже покрывает текущий
+      `squashfs-tools`, `gawk`, `findutils`, `tar`, `zstd` — не потребовалось
+- [x] Начинать с пустого списка `extraPkgs`: база FHS уже покрывает текущий
       рабочий сценарий
 
 ### B5. `package.nix`
 
-- [ ] Функция с точным списком аргументов, без `with`, lowerCamelCase
-- [ ] `buildInputs = [ sdl3 vulkan-loader vulkan-headers python3 ]`
-- [ ] `nativeBuildInputs` — только `meson` и `gettext` (`mesonHook` даёт
-      meson+ninja), плюс `pkg-config`
-- [ ] Python-зависимости из `python3.pkgs` (не `python313.withPackages`),
-      по списку из B3
-- [ ] Порядок атрибутов: `meta` последним
+- [x] Функция с точным списком аргументов, без `with`, lowerCamelCase
+- [x] `buildInputs = [ sdl3 vulkan-loader vulkan-headers python3 ]`
+- [x] `nativeBuildInputs` — `meson`, `ninja`, `pkg-config`, `gettext`,
+      `installShellFiles`, `makeWrapper`, `python`
+      — `mesonHook` **не** тянет `ninja`, а `strictDeps` требует `python` в
+      build-PATH (см. B12)
+- [x] Python-зависимости — **`python3.withPackages`**; `python3.pkgs.*` нерабочий
+      (не подтягиваются транзитивные модули, напр. `urllib3` для `requests`).
+      Отклонение от плана — согласовано (см. B12)
+- [x] Порядок атрибутов: `meta` последним
 
 ### B6. `mesonFlags`
 
 Каждый флаг — с комментарием «зачем»:
 
-- [ ] `-Dnightly=false` — дефолт, но фиксируем явно
-- [ ] `-Dpython_purelibdir=${placeholder "out"}/lib/python${python3.version}/site-packages`
+- [x] `-Dnightly=false` — дефолт, но фиксируем явно
+- [x] `-Dpython_purelibdir=${placeholder "out"}/lib/python${python3.version}/site-packages`
       — иначе meson определит purelib через `sysconfig` интерпретатора и
       попытается писать в store-путь (в песочнице read-only)
-- [ ] `-Dudev_rulesdir=${placeholder "out"}/lib/udev/rules.d` — если правило
+- [x] `-Dudev_rulesdir=${placeholder "out"}/lib/udev/rules.d` — если правило
       ещё есть после B3
 
 ### B7. `postInstall`
 
-- [ ] Сгенерировать комплишены: `bash dev-scripts/generate-completions.sh`
-- [ ] Установить через `installShellCompletion --bash --fish --zsh`
-- [ ] Текущие grep-проверки из нашего `postInstall` **перенести в тест** (B9) —
+- [x] Сгенерировать комплишены: `bash dev-scripts/generate-completions.sh`
+- [x] Установить через `installShellCompletion --bash --fish --zsh`
+- [x] Текущие grep-проверки из нашего `postInstall` **перенести в тест** (B9) —
       в nixpkgs самопроверки в `postInstall` неуместны
 
-### B8. `postFixUp` — FHS-обёртка
+### B8. `postFixup` — FHS-обёртка
 
-- [ ] `mv $out/bin/portprotonqt $out/bin/.portprotonqt-unwrapped`
-- [ ] `makeWrapper ${lib.getExe steamRun} $out/bin/portprotonqt` c флагами:
+- [x] `mv $out/bin/portprotonqt $out/bin/.portprotonqt-unwrapped`
+- [x] `makeWrapper ${lib.getExe steamRun} $out/bin/portprotonqt` c флагами:
       `--prefix PYTHONPATH`, `--prefix XDG_DATA_DIRS`, `--prefix PATH`,
       `--set STEAM_RUNTIME 1`, `--set STEAM_RUNTIME_PREFER_FRESH 1`
-- [ ] Комментарий «зачем FHS» обязателен: движку `start.sh` нужна настоящая
+- [x] Комментарий «зачем FHS» обязателен: движку `start.sh` нужна настоящая
       ФС с glibc, bash и системными утилитами — её нет на NixOS
 
 ### B9. `passthru`
 
-- [ ] `updateScript = nix-update-script { }`
-- [ ] `tests` — портированный smoke-тест: обёртка зовёт FHS и прописывает
+- [x] `updateScript = nix-update-script { }`
+- [x] `tests` — портированный smoke-тест: обёртка зовёт FHS и прописывает
       `PYTHONPATH`; NixOS-правки на месте; `bash -n` для обоих скриптов
       движка; CLI отдаёт справку; скомпилированные модули грузятся тем же
       интерпретатором, которым зовут хелперы движка
-- [ ] Без хардкода `python3.13` — через `${python3.pkgs.python.interpreter}`
+- [x] Без хардкода `python3.13` — через `${python.sitePackages}`
 
 ### B10. `meta`
 
-- [ ] `description` — без «PortProtonQt» и без точки. Например:
+- [x] `description` — без «PortProtonQt» и без точки. Например:
       «Graphical frontend for the PortProton compatibility layer»
-- [ ] `homepage`
-- [ ] `changelog`
-- [ ] `license = lib.licenses.gpl3Only`
-- [ ] `mainProgram = "portprotonqt"`
-- [ ] `platforms = [ "x86_64-linux" ]`
-- [ ] `maintainers` — см. C1
-- [ ] Комментарий рядом с `platforms`: пакет по определению x86_64-linux,
+- [x] `homepage`
+- [x] `changelog`
+- [x] `license = lib.licenses.gpl3Only`
+- [x] `mainProgram = "portprotonqt"`
+- [x] `platforms = [ "x86_64-linux" ]`
+- [x] `maintainers` — см. C1
+- [x] Комментарий рядом с `platforms`: пакет по определению x86_64-linux,
       FHS/steam-run под другие системы не собирается, сабститутов не будет
 
 ### B11. Проверки
 
-- [ ] `sandbox = true` в `/etc/nix/nix.conf`
-- [ ] `nix-build -A portprotonqt` — зелёный; python-дерево легло в
-      `$out/lib/python3.13/site-packages`
-- [ ] `nix-build -A portprotonqt.tests`
-- [ ] Прогнать все бинарники из `result/bin`: CLI напрямую (unwrapped) и через
+- [x] `sandbox = true` в `/etc/nix/nix.conf`
+- [x] `nix-build -A portprotonqt` — зелёный; python-дерево легло в
+      `$out/lib/python3.14/site-packages`
+- [x] `nix-build -A portprotonqt.tests`
+- [x] Прогнать все бинарники из `result/bin`: CLI напрямую (unwrapped) и через
       обёртку
-- [ ] **`nix fmt`** (или `nix develop --command treefmt`) — иначе CI упадёт на lint
+- [x] **`nix fmt`** (или `nix develop --command treefmt`) — иначе CI упадёт на lint
+- [x] `nixpkgs-vet --base <base> <head>` — `Validated successfully`
 - [ ] `nix run nixpkgs#nixpkgs-review -- wip`
+
+### B12. Отклонения от плана (согласованы)
+
+Зафиксировано по факту сборки; всё согласовано с владельцем.
+
+- [x] `python3.withPackages` вместо `python3.pkgs.*` — у последнего не
+      подхватываются транзитивные модули (`requests` без `urllib3` и т.п.),
+      пакет падает на импорте
+- [x] `strictDeps = true` и `__structuredAttrs = true` — обязательны для нового
+      пакета по `nixpkgs-vet`
+- [x] `ninja` и `python` в `nativeBuildInputs` — `mesonHook` не тянет `ninja`, а
+      при `strictDeps` шебанг резолвится из `HOST_PATH`, поэтому `python` нужен
+      ещё и в `buildInputs`
+- [x] Обёртка — минимальная (B8), без Qt/иконочных переменных из флейка
+- [x] Патч `get_version()` из флейка **не** переносится (влияет только на
+      заголовок окна при запуске из git-каталога)
 
 ---
 
@@ -425,7 +448,8 @@ curl -s https://git.linux-gaming.ru/api/v1/repos/Linux-Gaming/PortProtonQt/tags
 - [ ] Проверить ещё раз перед отправкой: `githubId` из
       `api.github.com/users/dark-siders` совпадает с handle, handle совпадает
       с автором коммита
-- [ ] В `maintainers/maintainer-list.nix` добавить запись (готовый текст — A1)
+- [x] В `maintainers/maintainer-list.nix` добавить запись (готовый текст — A1;
+      `lib/tests/maintainers.nix` → `checked-maintainers-success`)
 - [ ] Отдельный коммит `maintainers: add dark-siders`, **первым** в PR
 
 ### C2. Коммит пакета

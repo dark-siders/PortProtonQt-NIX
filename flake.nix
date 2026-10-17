@@ -113,12 +113,18 @@
               }
             done
 
+            #--- Qt-плагины: PySide6 в nixpkgs не поставляет своих Qt-плагинов,
+            # а галочки в чекбоксах рисуются из SVG-картинки (styles.py —
+            # QCheckBox::indicator:checked), поэтому нужен плагин формата
+            # изображения из qt6.qtsvg. Путь — lib/qt-6/plugins (Qt ≥ 6.6);
+            # раньше здесь стояло устаревшее lib/qt6/plugins, из-за чего
+            # QT_PLUGIN_PATH указывал в никуда.
             makeWrapper ${lib.getExe pkgs.steam-run} $out/bin/portprotonqt \
               --add-flags $out/bin/.portprotonqt-unwrapped \
               --prefix PYTHONPATH ':' "$out/lib/python3.13/site-packages" \
               --prefix XDG_DATA_DIRS ':' "$out/share" \
               --prefix PATH ':' "$out/bin:${python}/bin" \
-              --prefix QT_PLUGIN_PATH ':' "${pkgs.qt6.qtbase}/lib/qt6/plugins:${pkgs.qt6.qtwayland}/lib/qt6/plugins" \
+              --prefix QT_PLUGIN_PATH ':' "${pkgs.qt6.qtbase}/lib/qt-6/plugins:${pkgs.qt6.qtsvg}/lib/qt-6/plugins:${pkgs.qt6.qtwayland}/lib/qt-6/plugins" \
               --prefix XDG_DATA_DIRS ':' "${pkgs.kdePackages.breeze-icons}/share:${pkgs.kdePackages.oxygen-icons}/share" \
               --set QT_QPA_PLATFORMTHEME "qt6ct" \
               --set QT_STYLE_OVERRIDE "kvantum-dark" \
